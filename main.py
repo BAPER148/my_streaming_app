@@ -3,61 +3,72 @@ import requests
 from bs4 import BeautifulSoup
 import threading
 
-HEADERS = {"User-Agent": "Mozilla/5.0 (Linux; Android 10; SM-G973F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Mobile Safari/537.36"}
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36",
+    "Referer": "https://new6.hdhub4u.fo/"
+}
 
 def main(page: ft.Page):
     page.theme_mode = ft.ThemeMode.DARK
-    page.bgcolor = "#121212" # Solid background to avoid "pitch black" look
+    page.bgcolor = "#0f0f0f"
+    page.title = "PikaClone Pro"
     
-    movie_grid = ft.GridView(expand=1, runs_count=3, max_extent=150, spacing=10)
-    loader = ft.ProgressBar(width=400, color="blue", visible=False)
-    
-    def scrape_site(url, name):
-        loader.visible = True
+    movie_grid = ft.GridView(expand=1, runs_count=2, max_extent=200, spacing=12, padding=10)
+    progress_bar = ft.ProgressBar(width=400, color="yellow", visible=False)
+
+    def scrape_hdhub(url):
+        progress_bar.visible = True
         movie_grid.controls.clear()
         page.update()
         
         try:
-            # We added a 15-second timeout in case the school/local network is slow
             res = requests.get(url, headers=HEADERS, timeout=15)
-            if res.status_code != 200:
-                movie_grid.controls.append(ft.Text(f"Site blocked us (Error {res.status_code})"))
-            else:
-                soup = BeautifulSoup(res.text, 'html.parser')
-                items = soup.find_all(['article', 'div'], class_=['post-column', 'item', 'blog-post'])
-                
-                if not items:
-                    movie_grid.controls.append(ft.Text("No movies found. Try another category."))
-                
-                for item in items[:12]:
-                    img = item.find('img')
-                    title = item.find(['h2', 'h3'])
-                    if img and title:
-                        img_url = img.get('src') or img.get('data-src')
-                        movie_grid.controls.append(
-                            ft.Container(
-                                content=ft.Column([
-                                    ft.Image(src=img_url, border_radius=10, height=180, fit=ft.ImageFit.COVER),
-                                    ft.Text(title.get_text()[:20], size=10)
-                                ]),
-                                bgcolor="#1e1e1e",
-                                padding=5,
-                                border_radius=10
-                            )
+            soup = BeautifulSoup(res.text, 'html.parser')
+            
+            # HDHub4u usually wraps movies in 'figure' or 'div' with specific classes
+            posts = soup.find_all(['article', 'div'], class_=['post-column', 'img-box', 'movie-post'])
+            
+            if not posts:
+                # Fallback: Just look for any link that has an image and a title-like class
+                posts = soup.find_all('a', class_='ml-mask')
+
+            for post in posts[:20]:
+                img_tag = post.find('img')
+                # HDHub4u specific: check 'data-src', 'data-lazy-src', or 'src'
+                img_url = img_tag.get('data-src') or img_tag.get('data-lazy-src') or img_tag.get('src')
+                title = img_tag.get('alt') or "Untitled Movie"
+                link = post.get('href') if post.name == 'a' else post.find('a').get('href')
+
+                if img_url:
+                    movie_grid.controls.append(
+                        ft.Container(
+                            content=ft.Column([
+                                ft.Image(src=img_url, border_radius=12, height=220, fit=ft.ImageFit.COVER),
+                                ft.Text(title[:30], size=12, weight="bold", overflow=ft.TextOverflow.ELLIPSIS)
+                            ]),
+                            on_click=lambda e, l=link: print(f"Opening: {l}"),
+                            padding=5,
+                            bgcolor="#1e1e1e",
+                            border_radius=15,
                         )
+                    )
+            
+            if not movie_grid.controls:
+                movie_grid.controls.append(ft.Text("Empty-handed! The site might be blocking us.", color="red"))
+
         except Exception as e:
-            movie_grid.controls.append(ft.Text(f"Connection Error: {str(e)[:20]}"))
+            movie_grid.controls.append(ft.Text(f"Connection timed out. Try again!"))
         
-        loader.visible = False
+        progress_bar.visible = False
         page.update()
 
     page.add(
-        ft.AppBar(title=ft.Text("PIKACLONE V2.1"), bgcolor="#1f1f1f"),
-        loader,
-        ft.Row([
-            ft.TextButton("Hollywood", on_click=lambda _: threading.Thread(target=scrape_site, args=("https://vegamovies.wedding/", "Hollywood")).start()),
-            ft.TextButton("NetMirror", on_click=lambda _: threading.Thread(target=scrape_site, args=("https://netmirror.world/", "NetMirror")).start()),
-        ], scroll=ft.ScrollMode.ALWAYS),
+        ft.Text("HDHub4u Explorer", size=28, weight="bold", color="yellow"),
+        progress_bar,
+        ft.ElevatedButton("Load Latest Movies", 
+            on_click=lambda _: threading.Thread(target=scrape_hdhub, args=("https://new6.hdhub4u.fo/",)).start(),
+            bgcolor="yellow", color="black"
+        ),
         movie_grid
     )
 
