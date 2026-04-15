@@ -5,18 +5,12 @@ description = "Mobile Streaming App"
 
 [tool.flet]
 product = "PikaClone"
-artifact = "PikaClone"
-bundle_id = "com.yourname.pikaclone"
+bundle_id = "com.baper.pikaclone"
 
 [tool.flet.android]
-# These are the "keys" we talked about
-permissions = [
-    "android.permission.INTERNET",
-    "android.permission.WRITE_EXTERNAL_STORAGE",
-    "android.permission.READ_EXTERNAL_STORAGE",
-    "android.permission.WAKE_LOCK",
-    "android.permission.FOREGROUND_SERVICE"
-]
+permissions = ["INTERNET"]
+# This is the secret sauce that stops the black screen
+allow_cleartext_traffic = true
 
 [tool.flet.app]
 path = "."
