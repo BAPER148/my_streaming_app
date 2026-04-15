@@ -3,81 +3,61 @@ import requests
 from bs4 import BeautifulSoup
 import threading
 
-# Header to trick sites into thinking we are a mobile phone
-HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Mobile Safari/537.36"
-}
+HEADERS = {"User-Agent": "Mozilla/5.0 (Linux; Android 10; SM-G973F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Mobile Safari/537.36"}
 
 def main(page: ft.Page):
-    page.title = "PikaClone"
     page.theme_mode = ft.ThemeMode.DARK
-    page.padding = 10
+    page.bgcolor = "#121212" # Solid background to avoid "pitch black" look
     
-    movie_grid = ft.GridView(
-        expand=1,
-        runs_count=3,
-        max_extent=150,
-        child_aspect_ratio=0.6,
-        spacing=10,
-    )
-
-    # Status text to show loading progress
-    status_text = ft.Text("Select a category to start", color="grey")
-
-    def scrape_site(url, category_name):
+    movie_grid = ft.GridView(expand=1, runs_count=3, max_extent=150, spacing=10)
+    loader = ft.ProgressBar(width=400, color="blue", visible=False)
+    
+    def scrape_site(url, name):
+        loader.visible = True
         movie_grid.controls.clear()
-        status_text.value = f"Scraping {category_name}..."
         page.update()
         
         try:
-            res = requests.get(url, headers=HEADERS, timeout=10)
-            soup = BeautifulSoup(res.text, 'html.parser')
-            
-            # This logic targets common patterns in Vegamovies/MkvCinemas
-            # It looks for 'article' tags or 'div' with movie classes
-            items = soup.find_all(['article', 'div'], class_=['post-column', 'blog-post', 'item'])
-            
-            for item in items[:15]: # Limit to 15 items for speed
-                title_tag = item.find(['h2', 'h3'])
-                img_tag = item.find('img')
-                link_tag = item.find('a')
+            # We added a 15-second timeout in case the school/local network is slow
+            res = requests.get(url, headers=HEADERS, timeout=15)
+            if res.status_code != 200:
+                movie_grid.controls.append(ft.Text(f"Site blocked us (Error {res.status_code})"))
+            else:
+                soup = BeautifulSoup(res.text, 'html.parser')
+                items = soup.find_all(['article', 'div'], class_=['post-column', 'item', 'blog-post'])
                 
-                if title_tag and img_tag:
-                    title = title_tag.get_text(strip=True)[:30] + "..."
-                    img_url = img_tag.get('src') or img_tag.get('data-src')
-                    video_url = link_tag.get('href') if link_tag else "#"
-                    
-                    movie_grid.controls.append(
-                        ft.Container(
-                            content=ft.Column([
-                                ft.Image(src=img_url, border_radius=10, fit=ft.ImageFit.COVER),
-                                ft.Text(title, size=11, weight="bold", max_lines=2)
-                            ]),
-                            on_click=lambda e, u=video_url: print(f"Link: {u}")
+                if not items:
+                    movie_grid.controls.append(ft.Text("No movies found. Try another category."))
+                
+                for item in items[:12]:
+                    img = item.find('img')
+                    title = item.find(['h2', 'h3'])
+                    if img and title:
+                        img_url = img.get('src') or img.get('data-src')
+                        movie_grid.controls.append(
+                            ft.Container(
+                                content=ft.Column([
+                                    ft.Image(src=img_url, border_radius=10, height=180, fit=ft.ImageFit.COVER),
+                                    ft.Text(title.get_text()[:20], size=10)
+                                ]),
+                                bgcolor="#1e1e1e",
+                                padding=5,
+                                border_radius=10
+                            )
                         )
-                    )
-            
-            status_text.value = f"Loaded {category_name} successfully!"
         except Exception as e:
-            status_text.value = f"Error: {str(e)[:30]}"
+            movie_grid.controls.append(ft.Text(f"Connection Error: {str(e)[:20]}"))
         
+        loader.visible = False
         page.update()
 
-    # Category buttons
-    categories = ft.Row(
-        scroll=ft.ScrollMode.ALWAYS,
-        controls=[
-            ft.ElevatedButton("Hollywood", on_click=lambda _: threading.Thread(target=scrape_site, args=("https://vegamovies.wedding/category/hollywood-movies/", "Hollywood")).start()),
-            ft.ElevatedButton("Bollywood", on_click=lambda _: threading.Thread(target=scrape_site, args=("https://mkvcinemas.ph/category/bollywood-movies/", "Bollywood")).start()),
-            ft.ElevatedButton("NetMirror", on_click=lambda _: threading.Thread(target=scrape_site, args=("https://netmirror.world/", "NetMirror")).start()),
-            ft.ElevatedButton("Sports/MMA", on_click=lambda _: print("MMA logic coming soon!")),
-        ]
-    )
-
     page.add(
-        ft.AppBar(title=ft.Text("PIKACLONE v2"), center_title=True, bgcolor=ft.Colors.SURFACE_VARIANT),
-        categories,
-        status_text,
+        ft.AppBar(title=ft.Text("PIKACLONE V2.1"), bgcolor="#1f1f1f"),
+        loader,
+        ft.Row([
+            ft.TextButton("Hollywood", on_click=lambda _: threading.Thread(target=scrape_site, args=("https://vegamovies.wedding/", "Hollywood")).start()),
+            ft.TextButton("NetMirror", on_click=lambda _: threading.Thread(target=scrape_site, args=("https://netmirror.world/", "NetMirror")).start()),
+        ], scroll=ft.ScrollMode.ALWAYS),
         movie_grid
     )
 
