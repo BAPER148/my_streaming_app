@@ -1,0 +1,23 @@
+[project]
+name = "pikaclone"
+version = "0.1.0"
+description = "Mobile Streaming App"
+
+[tool.flet]
+product = "PikaClone"
+artifact = "PikaClone"
+bundle_id = "com.yourname.pikaclone"
+
+[tool.flet.android]
+# These are the "keys" we talked about
+permissions = [
+    "android.permission.INTERNET",
+    "android.permission.WRITE_EXTERNAL_STORAGE",
+    "android.permission.READ_EXTERNAL_STORAGE",
+    "android.permission.WAKE_LOCK",
+    "android.permission.FOREGROUND_SERVICE"
+]
+
+[tool.flet.app]
+path = "."
+entry_point = "main.py"
